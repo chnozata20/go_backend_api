@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/cihan-ozata/go-backend-api/config"
-	"github.com/cihan-ozata/go-backend-api/internal/repository"
-	"github.com/cihan-ozata/go-backend-api/pkg/logger"
+	"github.com/cihan-ozata/backend-path/config"
+	"github.com/cihan-ozata/backend-path/internal/repository"
+	"github.com/cihan-ozata/backend-path/pkg/logger"
 )
 
 // App, uygulama yapısını temsil eder

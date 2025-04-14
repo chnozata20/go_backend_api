@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/cihan-ozata/go-backend-api/pkg/logger"
+	"github.com/cihan-ozata/backend-path/pkg/logger"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
 )

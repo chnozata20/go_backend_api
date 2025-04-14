@@ -3,9 +3,9 @@ package repository
 import (
 	"fmt"
 
-	"github.com/cihan-ozata/go-backend-api/config"
-	"github.com/cihan-ozata/go-backend-api/internal/models"
-	"github.com/cihan-ozata/go-backend-api/pkg/logger"
+	"github.com/cihan-ozata/backend-path/config"
+	"github.com/cihan-ozata/backend-path/internal/models"
+	"github.com/cihan-ozata/backend-path/pkg/logger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
