@@ -113,6 +113,23 @@ func (s *UserService) Register(ctx context.Context, user *domain.User) error {
 	if err := user.Validate(); err != nil {
 		return err
 	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	user.Password = string(hashedPassword)
+
+	// Set default role if not specified
+	if user.Role == "" {
+		user.Role = domain.UserRoleUser
+	}
+
+	// Set timestamps
+	user.CreatedAt = time.Now()
+	user.UpdatedAt = time.Now()
+
 	return s.userRepo.Create(ctx, user)
 }
 
@@ -121,9 +138,15 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*domai
 	if err != nil {
 		return nil, err
 	}
-	if user.Password != password {
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+
+	// Compare password hash
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
 		return nil, errors.New("invalid credentials")
 	}
+
 	return user, nil
 }
 

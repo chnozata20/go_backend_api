@@ -24,6 +24,7 @@ type RegisterRequest struct {
 	Username string `json:"username" binding:"required"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
+	Role     string `json:"role" binding:"required,oneof=user admin manager"`
 }
 
 // LoginRequest represents the request body for user login
@@ -51,6 +52,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 		Username: req.Username,
 		Email:    req.Email,
 		Password: req.Password,
+		Role:     domain.UserRole(req.Role),
 	}
 
 	if err := h.userService.Register(c.Request.Context(), user); err != nil {
@@ -76,7 +78,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	token, err := jwt.GenerateToken(user.ID, user.Username, user.Email)
+	token, err := jwt.GenerateToken(user.ID, user.Username, user.Email, string(user.Role))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
 		return

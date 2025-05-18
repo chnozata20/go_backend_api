@@ -54,6 +54,7 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (*User, error)
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, id string) error
+	FindAll(ctx context.Context) ([]*User, error)
 }
 
 // UserService defines the interface for user business logic
@@ -63,4 +64,11 @@ type UserService interface {
 	GetUserByID(ctx context.Context, id string) (*User, error)
 	UpdateUser(ctx context.Context, user *User) error
 	DeleteUser(ctx context.Context, id string) error
+	GetAllUsers(ctx context.Context) ([]*User, error)
+}
+
+// LoginRequest represents a login request
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,password"`
 } 
