@@ -1,0 +1,33 @@
+# Go specific ignores
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+*.trace
+*.log
+
+# Go workspace ignores
+bin/
+pkg/
+vendor/
+
+# IDE specific ignores
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific ignores
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+
+# Dependency directories
+node_modules/ 
