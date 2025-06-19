@@ -54,4 +54,14 @@ func (r *WalletRepository) Update(ctx context.Context, wallet *domain.Wallet) er
 // Delete deletes a wallet by user ID
 func (r *WalletRepository) Delete(ctx context.Context, userID uint) error {
 	return r.db.WithContext(ctx).Where("user_id = ?", userID).Delete(&domain.Wallet{}).Error
+}
+
+// FindAll finds all wallets
+func (r *WalletRepository) FindAll(ctx context.Context) ([]*domain.Wallet, error) {
+	var wallets []*domain.Wallet
+	err := r.db.WithContext(ctx).Find(&wallets).Error
+	if err != nil {
+		return nil, err
+	}
+	return wallets, nil
 } 

@@ -120,4 +120,14 @@ func (h *TransactionHandler) GetAllTransactions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, transactions)
+}
+
+// ListTransactions handles getting all transactions
+func (h *TransactionHandler) ListTransactions(c *gin.Context) {
+	transactions, err := h.transactionService.GetAllTransactions(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, transactions)
 } 

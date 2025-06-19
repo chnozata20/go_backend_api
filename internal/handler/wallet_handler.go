@@ -109,4 +109,54 @@ func (h *WalletHandler) GetWalletBalance(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"balance": balance})
+}
+
+// UpdateWalletRequest represents the request body for updating a wallet
+type UpdateWalletRequest struct {
+	Currency string  `json:"currency"`
+	Balance  float64 `json:"balance" binding:"gte=0"`
+}
+
+// UpdateWallet handles updating a wallet
+func (h *WalletHandler) UpdateWallet(c *gin.Context) {
+	walletID := c.Param("id")
+
+	var req UpdateWalletRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	wallet, err := h.walletService.GetWalletByID(c.Request.Context(), walletID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if wallet == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Wallet not found"})
+		return
+	}
+
+	// Update wallet fields
+	if req.Currency != "" {
+		wallet.Currency = req.Currency
+	}
+	wallet.Balance = req.Balance
+
+	if err := h.walletService.UpdateWallet(c.Request.Context(), wallet); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Wallet updated successfully"})
+}
+
+// ListWallets handles getting all wallets
+func (h *WalletHandler) ListWallets(c *gin.Context) {
+	wallets, err := h.walletService.GetAllWallets(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, wallets)
 } 

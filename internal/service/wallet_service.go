@@ -75,4 +75,9 @@ func (s *WalletService) DeleteWallet(ctx context.Context, userID uint) error {
 // GetWalletByUserID retrieves a wallet by user ID
 func (s *WalletService) GetWalletByUserID(ctx context.Context, userID uint) (*domain.Wallet, error) {
 	return s.walletRepo.FindByUserID(ctx, userID)
+}
+
+// GetAllWallets retrieves all wallets
+func (s *WalletService) GetAllWallets(ctx context.Context) ([]*domain.Wallet, error) {
+	return s.walletRepo.FindAll(ctx)
 } 

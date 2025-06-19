@@ -53,12 +53,7 @@ func main() {
 		log.Fatal("Veritabanına bağlanılamadı:", err)
 	}
 
-	// Veritabanını sıfırlamak için bu satırı ekleyin
-	if err := resetDatabase(db); err != nil {
-		log.Fatal("Failed to reset database:", err)
-	}
-
-	// Auto migrate database schema
+	// Auto migrate database schema FIRST
 	if err := db.AutoMigrate(
 		&domain.User{},
 		&domain.Transaction{},
@@ -66,6 +61,11 @@ func main() {
 		&domain.Payment{},
 	); err != nil {
 		log.Fatal("Failed to migrate database:", err)
+	}
+
+	// THEN reset database tables (after they exist)
+	if err := resetDatabase(db); err != nil {
+		log.Fatal("Failed to reset database:", err)
 	}
 
 	// Initialize repositories

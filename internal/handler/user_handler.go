@@ -167,4 +167,37 @@ func (h *UserHandler) GetAllUsers(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, users)
+}
+
+// CreateUser handles creating a new user
+func (h *UserHandler) CreateUser(c *gin.Context) {
+	var req RegisterRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	user := &domain.User{
+		Username: req.Username,
+		Email:    req.Email,
+		Password: req.Password,
+		Role:     domain.UserRole(req.Role),
+	}
+
+	if err := h.userService.Register(c.Request.Context(), user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully", "user": user})
+}
+
+// ListUsers handles getting all users
+func (h *UserHandler) ListUsers(c *gin.Context) {
+	users, err := h.userService.GetAllUsers(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, users)
 } 

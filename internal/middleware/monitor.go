@@ -2,10 +2,58 @@ package middleware
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+)
+
+// Prometheus metrics
+var (
+	httpRequestsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"method", "endpoint", "status"},
+	)
+
+	httpRequestDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_duration_seconds",
+			Help:    "HTTP request duration in seconds",
+			Buckets: prometheus.DefBuckets,
+		},
+		[]string{"method", "endpoint"},
+	)
+
+	httpRequestsInFlight = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "http_requests_in_flight",
+			Help: "Current number of HTTP requests being processed",
+		},
+	)
+
+	httpRequestSize = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_request_size_bytes",
+			Help:    "HTTP request size in bytes",
+			Buckets: prometheus.ExponentialBuckets(100, 10, 8),
+		},
+		[]string{"method", "endpoint"},
+	)
+
+	httpResponseSize = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "http_response_size_bytes",
+			Help:    "HTTP response size in bytes",
+			Buckets: prometheus.ExponentialBuckets(100, 10, 8),
+		},
+		[]string{"method", "endpoint"},
+	)
 )
 
 // Metrics holds performance metrics
@@ -30,11 +78,21 @@ var metrics = &Metrics{
     endpointMetrics: make(map[string]*EndpointMetrics),
 }
 
-// MonitorMiddleware handles performance monitoring
+// MonitorMiddleware handles performance monitoring with Prometheus metrics
 func MonitorMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
         start := time.Now()
         path := c.Request.URL.Path
+
+        // Increment in-flight requests for Prometheus
+        httpRequestsInFlight.Inc()
+        defer httpRequestsInFlight.Dec()
+
+        // Get request size for Prometheus
+        requestSize := c.Request.ContentLength
+        if requestSize > 0 {
+            httpRequestSize.WithLabelValues(c.Request.Method, c.FullPath()).Observe(float64(requestSize))
+        }
 
         // Process request
         c.Next()
@@ -43,6 +101,7 @@ func MonitorMiddleware() gin.HandlerFunc {
         latency := time.Since(start)
         status := c.Writer.Status()
 
+        // Update custom metrics
         metrics.mu.Lock()
         defer metrics.mu.Unlock()
 
@@ -71,6 +130,22 @@ func MonitorMiddleware() gin.HandlerFunc {
         }
         if latency > endpoint.MaxLatency {
             endpoint.MaxLatency = latency
+        }
+
+        // Update Prometheus metrics
+        statusStr := strconv.Itoa(status)
+        endpointPath := c.FullPath()
+        if endpointPath == "" {
+            endpointPath = "unknown"
+        }
+
+        httpRequestsTotal.WithLabelValues(c.Request.Method, endpointPath, statusStr).Inc()
+        httpRequestDuration.WithLabelValues(c.Request.Method, endpointPath).Observe(latency.Seconds())
+
+        // Get response size for Prometheus
+        responseSize := c.Writer.Size()
+        if responseSize > 0 {
+            httpResponseSize.WithLabelValues(c.Request.Method, endpointPath).Observe(float64(responseSize))
         }
 
         // Log performance metrics

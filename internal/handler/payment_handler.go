@@ -130,4 +130,14 @@ func (h *PaymentHandler) GetAllPayments(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, payments)
+}
+
+// ListPayments handles getting all payments
+func (h *PaymentHandler) ListPayments(c *gin.Context) {
+	payments, err := h.paymentService.GetAllPayments(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, payments)
 } 

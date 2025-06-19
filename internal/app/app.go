@@ -10,8 +10,15 @@ import (
 	"time"
 
 	"github.com/cihan-ozata/backend-path/config"
+	"github.com/cihan-ozata/backend-path/internal/handler"
+	"github.com/cihan-ozata/backend-path/internal/middleware"
 	"github.com/cihan-ozata/backend-path/internal/repository"
+	"github.com/cihan-ozata/backend-path/internal/service"
 	"github.com/cihan-ozata/backend-path/pkg/logger"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/pprof"
+	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // App, uygulama yapısını temsil eder
@@ -20,6 +27,7 @@ type App struct {
 	logger   logger.Logger
 	server   *http.Server
 	database *repository.Database
+	router   *gin.Engine
 }
 
 // New, yeni bir uygulama örneği oluşturur
@@ -39,21 +47,145 @@ func New() (*App, error) {
 		return nil, fmt.Errorf("veritabanı bağlantısı oluşturulamadı: %w", err)
 	}
 
+	// App instance oluştur
+	app := &App{
+		config:   cfg,
+		logger:   log,
+		database: db,
+	}
+
+	// Gin router oluştur
+	router := gin.New()
+
+	// Jaeger tracer'ı başlat
+	if err := middleware.InitTracer("backend-api", "jaeger:14268"); err != nil {
+		log.Warn("Jaeger tracer başlatılamadı", map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+
+	// Middleware'leri ekle
+	router.Use(gin.Recovery())
+	router.Use(middleware.LoggerMiddleware())
+	router.Use(middleware.MonitorMiddleware())
+	router.Use(middleware.TracingMiddleware())
+
+	// CORS middleware
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+
+	// Monitoring endpoint'leri
+	router.GET("/health", app.healthCheck)
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	router.GET("/ready", app.readyCheck)
+
+	// Pprof endpoint'leri (development için)
+	if cfg.Logging.Level == "debug" {
+		pprof.Register(router)
+	}
+
+	// Services ve handlers oluştur
+	userRepo := repository.NewUserRepository(db.DB)
+	userService := service.NewUserService(userRepo)
+	userHandler := handler.NewUserHandler(userService)
+
+	transactionRepo := repository.NewTransactionRepository(db.DB)
+	walletRepo := repository.NewWalletRepository(db.DB)
+	transactionService := service.NewTransactionService(transactionRepo, walletRepo)
+	transactionHandler := handler.NewTransactionHandler(transactionService)
+
+	walletService := service.NewWalletService(walletRepo)
+	walletHandler := handler.NewWalletHandler(walletService)
+
+	paymentRepo := repository.NewPaymentRepository(db.DB)
+	paymentService := service.NewPaymentService(paymentRepo, walletRepo, transactionRepo)
+	paymentHandler := handler.NewPaymentHandler(paymentService)
+
+	// API routes
+	api := router.Group("/api/v1")
+	{
+		// User routes
+		users := api.Group("/users")
+		{
+			users.POST("/", userHandler.CreateUser)
+			users.GET("/:id", userHandler.GetUser)
+			users.PUT("/:id", userHandler.UpdateUser)
+			users.DELETE("/:id", userHandler.DeleteUser)
+			users.GET("/", userHandler.ListUsers)
+		}
+
+		// Transaction routes
+		transactions := api.Group("/transactions")
+		{
+			transactions.POST("/", transactionHandler.CreateTransaction)
+			transactions.GET("/:id", transactionHandler.GetTransaction)
+			transactions.GET("/", transactionHandler.ListTransactions)
+		}
+
+		// Wallet routes
+		wallets := api.Group("/wallets")
+		{
+			wallets.POST("/", walletHandler.CreateWallet)
+			wallets.GET("/:id", walletHandler.GetWallet)
+			wallets.PUT("/:id", walletHandler.UpdateWallet)
+			wallets.GET("/", walletHandler.ListWallets)
+		}
+
+		// Payment routes
+		payments := api.Group("/payments")
+		{
+			payments.POST("/", paymentHandler.CreatePayment)
+			payments.GET("/:id", paymentHandler.GetPayment)
+			payments.GET("/", paymentHandler.ListPayments)
+		}
+	}
+
 	// HTTP sunucusu oluştur
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      http.DefaultServeMux,
+		Handler:      router,
 		ReadTimeout:  cfg.Server.ReadTimeout,
 		WriteTimeout: cfg.Server.WriteTimeout,
 		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
 
-	return &App{
-		config:   cfg,
-		logger:   log,
-		server:   server,
-		database: db,
-	}, nil
+	app.server = server
+	app.router = router
+
+	return app, nil
+}
+
+// healthCheck endpoint'i
+func (a *App) healthCheck(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "healthy",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"service":   "backend-api",
+	})
+}
+
+// readyCheck endpoint'i
+func (a *App) readyCheck(c *gin.Context) {
+	// Veritabanı bağlantısını kontrol et
+	if err := a.database.DB.Raw("SELECT 1").Error; err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":    "not ready",
+			"timestamp": time.Now().Format(time.RFC3339),
+			"error":     "database connection failed",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "ready",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"service":   "backend-api",
+	})
 }
 
 // Run, uygulamayı başlatır
